@@ -48,7 +48,7 @@ export function Contact() {
 
         <div className="flex-1 w-full bg-[#f0f0ea] dark:bg-[#111827] p-8 rounded-xl border border-[#cbc9c0] dark:border-white/5 shadow-xl transition-colors duration-300">
           <form action="https://api.web3forms.com/submit" method="POST" className="space-y-6">
-            <input type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY" />
+            <input type="hidden" name="access_key" value="cc69284c-5971-4fb5-b7a3-5de7d21aa95d" />
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-400 transition-colors">Name</label>
