@@ -9,7 +9,7 @@ async function getHTBStats() {
       headers: {
         Authorization: `Bearer ${token}`
       },
-      next: { revalidate: 3600 } // Cache for 1 hour
+      cache: 'no-store' // in order to get real time data
     });
     if (!res.ok) return null;
     const data = await res.json();
