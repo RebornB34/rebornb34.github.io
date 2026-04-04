@@ -47,12 +47,15 @@ export function Contact() {
         </div>
 
         <div className="flex-1 w-full bg-[#f0f0ea] dark:bg-[#111827] p-8 rounded-xl border border-[#cbc9c0] dark:border-white/5 shadow-xl transition-colors duration-300">
-          <form className="space-y-6">
+          <form action="https://api.web3forms.com/submit" method="POST" className="space-y-6">
+            <input type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY" />
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-400 transition-colors">Name</label>
                 <input
                   type="text"
+                  name="name"
+                  required
                   className="w-full bg-white dark:bg-[#0B1120] border border-[#cbc9c0] dark:border-white/10 rounded-md px-4 py-3 text-[#1a1a1a] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#a72334] dark:focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="John Doe"
                 />
@@ -61,6 +64,8 @@ export function Contact() {
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-400 transition-colors">Email</label>
                 <input
                   type="email"
+                  name="email"
+                  required
                   className="w-full bg-white dark:bg-[#0B1120] border border-[#cbc9c0] dark:border-white/10 rounded-md px-4 py-3 text-[#1a1a1a] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#a72334] dark:focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="john@example.com"
                 />
@@ -71,6 +76,8 @@ export function Contact() {
               <label className="text-sm font-medium text-gray-700 dark:text-gray-400 transition-colors">Subject</label>
               <input
                 type="text"
+                name="subject"
+                required
                 className="w-full bg-white dark:bg-[#0B1120] border border-[#cbc9c0] dark:border-white/10 rounded-md px-4 py-3 text-[#1a1a1a] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#a72334] dark:focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="How can I help you?"
               />
@@ -80,6 +87,8 @@ export function Contact() {
               <label className="text-sm font-medium text-gray-700 dark:text-gray-400 transition-colors">Message</label>
               <textarea
                 rows={4}
+                name="message"
+                required
                 className="w-full bg-white dark:bg-[#0B1120] border border-[#cbc9c0] dark:border-white/10 rounded-md px-4 py-3 text-[#1a1a1a] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#a72334] dark:focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                 placeholder="Write your message here..."
               ></textarea>

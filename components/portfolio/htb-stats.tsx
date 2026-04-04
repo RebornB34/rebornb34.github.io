@@ -8,8 +8,7 @@ async function getHTBStats() {
     const res = await fetch("https://labs.hackthebox.com/api/v4/user/profile/basic/2252974", {
       headers: {
         Authorization: `Bearer ${token}`
-      },
-      cache: 'no-store' // in order to get real time data
+      }
     });
     if (!res.ok) return null;
     const data = await res.json();
