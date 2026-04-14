@@ -1,55 +1,31 @@
-# Brian Bundi - Cyber Portfolio
+# Brian Bundi - Personal Portfolio
 
-A modern, sleek dark-mode developer portfolio built with Next.js 15, featuring a deep navy "Cyber" aesthetic, responsive flex layouts, and custom animations.
+Welcome to the source code for my personal cybersecurity and developer portfolio.
 
-## Tech Stack
+**Live Site:** [https://rebornb34.github.io/](https://rebornb34.github.io/)
+
+## Overview
+
+This repository contains the Next.js application that powers my online portfolio, showcasing my skills, experience, and projects in cybersecurity and software development. 
+
+### Built With
 
 - **Framework:** Next.js 15 (App Router)
 - **Language:** TypeScript
-- **Styling:** Tailwind CSS (with custom utility configurations)
+- **Styling:** Tailwind CSS
 - **Icons:** Lucide React
-- **Font:** Fira Code (Monospace cyber aesthetic globally)
 
-## Features
+## Running Locally
 
-- Sleek Cyber design with deep navy backgrounds and glowing cyan/blue accents
-- Responsive single-page scrolling layout replacing rigid grids
-- Real-time digital clock built directly into the sticky navigation
-- Dynamic, interactive sections:
-  - **Hero Profile**: Animated shield and gradient text.
-  - **About Me**: Feature cards highlighting cybersecurity focus.
-  - **Technical Skills**: Animated progress bars and statistic widgets.
-  - **Projects Showcase**: Standardized terminal console block.
-  - **Contact Form**: Professionally designed layout with modern inputs.
-- Dark mode native out-of-the-box.
-
-## Project Structure
-
-```
-my-portfolio/
-├── app/
-│   ├── layout.tsx      # Root layout with Fira Code fonts and metadata
-│   ├── page.tsx        # Main scrolling portfolio page
-│   └── globals.css     # Cyber theme CSS variables and styling
-├── components/
-│   └── portfolio/
-│       ├── navbar.tsx      # Sticky navigation with clock
-│       ├── hero.tsx        # Hero section with name and buttons
-│       ├── about.tsx       # Timeline and feature cards
-│       ├── skills.tsx      # Stats and precise skill progress
-│       ├── projects.tsx    # Showcase terminal interface
-│       └── contact.tsx     # Contact info and form
-```
-
-## Getting Started
+To explore or run this project locally:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/RebornB34/my-portfolio.git
-   cd my-portfolio
+   git clone https://github.com/RebornB34/rebornb34.github.io.git
+   cd rebornb34.github.io
    ```
 
-2. Install dependencies (Using PNPM is strictly enforced for optimal caching like Vercel):
+2. Install dependencies:
    ```bash
    pnpm install
    ```
@@ -60,16 +36,3 @@ my-portfolio/
    ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Customization
-
-To personalize this portfolio:
-
-1. Update the name, title, profile avatar and resume link in `components/portfolio/hero.tsx`
-2. Modify cybersecurity skill tags and values in `components/portfolio/skills.tsx`
-3. Add your actual projects to `components/portfolio/projects.tsx`
-4. Update contact details in `components/portfolio/contact.tsx`
-
-## License
-
-MIT License - feel free to use this template for your own portfolio.
