@@ -6,7 +6,7 @@ export function TechStackBlock() {
     { category: "SYS.FRONT", items: "REACT, NEXT.JS, VUE" },
     { category: "SYS.BACK", items: "NODE, EXPRESS, FASTAPI" },
     { category: "SYS.DB", items: "POSTGRES, MONGO, REDIS" },
-    { category: "SYS.CLOUD", items: "AWS, VERCEL, DOCKER" },
+    { category: "SYS.CLOUD", items: "AWS, GH-PAGES, DOCKER" },
     { category: "SYS.TOOLS", items: "GIT, LINUX, FIGMA" },
   ];
 

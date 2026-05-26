@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <defs>
+    <linearGradient id="cyberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#a72334" />
+    </linearGradient>
+  </defs>
+  <!-- Sleek cyber shield background -->
+  <path d="M16 3 L27 6.5 V15 C27 21.5 22.3 26.8 16 29 C9.7 26.8 5 21.5 5 15 V6.5 Z" 
+        stroke="url(#cyberGrad)" 
+        stroke-width="2.5" 
+        stroke-linejoin="round" 
+        fill="#0b1120" />
+  <!-- Terminal prompt (>) in cyan -->
+  <path d="M10.5 12 L13.5 15 L10.5 18" 
+        stroke="#22d3ee" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+  <!-- Stylized blocky B in white -->
+  <path d="M16 10 V20 M16 10 H20 A 2.5 2.5 0 0 1 22.5 12.5 A 2.5 2.5 0 0 1 20 15 H16 M16 15 H20 A 2.5 2.5 0 0 1 22.5 17.5 A 2.5 2.5 0 0 1 20 20 H16" 
+        stroke="#ffffff" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+</svg>
