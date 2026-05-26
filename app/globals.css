@@ -100,3 +100,72 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Custom premium Prism dark theme to match site's cyber-security aesthetic */
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: #f8fafc; /* Slate-50 */
+}
+
+/* Prism tokens */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #64748b; /* Slate-500 */
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #94a3b8; /* Slate-400 */
+}
+
+.token.namespace {
+  opacity: 0.7;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #f43f5e; /* Rose-500 */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #10b981; /* Emerald-500 */
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: #38bdf8; /* Sky-400 */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #3b82f6; /* Blue-500 */
+  font-weight: 600;
+}
+
+.token.function,
+.token.class-name {
+  color: #22d3ee; /* Cyan-400 */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #fbbf24; /* Amber-400 */
+}
+
