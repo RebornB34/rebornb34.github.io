@@ -19,6 +19,9 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Brian Bundi | Student Engineer & Builder",
   description: "Computer Science student and Full-Stack Developer",
+  verification: {
+    google: "KzYQBWi5PrK_-0pWxvbRvtTe-CrEhbuB_61goJQfAWY",
+  },
 };
 
 export const viewport: Viewport = {
