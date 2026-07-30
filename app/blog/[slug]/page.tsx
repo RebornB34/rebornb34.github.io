@@ -80,7 +80,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         <div className="text-[#a72334] dark:text-blue-400 font-mono flex items-center gap-4 transition-colors">
           <time>{post.date}</time>
           <span className="text-[#cbc9c0] dark:text-gray-600">|</span>
-          <span className="text-gray-700 dark:text-gray-400">brian@portfolio</span>
+          <span className="text-gray-700 dark:text-gray-400">brian@labs</span>
         </div>
       </header>
 
