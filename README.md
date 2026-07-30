@@ -1,3 +1,3 @@
-# Brian Bundi - Personal Portfolio
+# Brian Bundi - Labs
 
-Welcome to the source code for my personal cybersecurity and developer portfolio.
+labs for cybersecurity and developer student.
