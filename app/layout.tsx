@@ -1,19 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Fira_Code, Playfair_Display } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-const firaCode = Fira_Code({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-fira",
-  weight: ["300", "400", "500", "600", "700"],
-});
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-jetbrains",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -54,7 +48,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${firaCode.variable} ${playfair.variable} font-sans antialiased bg-[#e8e7e1] text-[#1a1a1a] dark:bg-[#0B1120] dark:text-gray-100 flex flex-col min-h-screen transition-colors duration-300`}>
+      <body className={`${jetbrainsMono.variable} font-sans antialiased bg-[#e8e7e1] text-[#1a1a1a] dark:bg-[#0B1120] dark:text-gray-100 flex flex-col min-h-screen transition-colors duration-300`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
