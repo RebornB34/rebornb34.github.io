@@ -1,6 +1,7 @@
 node_modules/
 .next/
 out/
+.idea/
 
 # Environment files (contain secrets - NEVER commit these)
 .env

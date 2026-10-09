@@ -40,7 +40,7 @@ export async function HTBStats() {
         </div>
         <div>
           <h3 className="text-2xl font-bold text-[#1a1a1a] dark:text-white tracking-wide font-serif dark:font-sans transition-colors">Hack The Box Live Stats</h3>
-          <p className="text-sm font-mono text-[#a72334]/80 dark:text-green-400/80 mt-1 transition-colors">Status: Connected to API</p>
+          <p className="text-sm font-mono text-[#a72334]/80 dark:text-green-400/80 mt-1 transition-colors">Status: Connected</p>
         </div>
       </div>
 
