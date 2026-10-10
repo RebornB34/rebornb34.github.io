@@ -2,9 +2,9 @@ import { HTBStats } from "./htb-stats";
 
 export function Skills() {
   const stats = [
-    { label: "Projects Completed", value: "15+" },
-    { label: "Certifications Earned", value: "5+" },
-    { label: "Years of Experience", value: "2+" },
+    { label: "Projects Completed", value: "3+" },
+    { label: "Certifications Earned", value: "2+" },
+    { label: "Years of Experience", value: "1" },
   ];
 
   const skillCategories = [
