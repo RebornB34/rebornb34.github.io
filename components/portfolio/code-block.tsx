@@ -72,8 +72,8 @@ export function CodeBlock({ rawCode, language, highlightedHtml }: CodeBlockProps
       </div>
 
       {/* Code body */}
-      <div className="overflow-x-auto">
-        <pre className="!p-4 !m-0 font-mono text-xs md:text-sm leading-relaxed text-gray-100 bg-[#0B1120] overflow-x-auto whitespace-pre">
+      <div className="overflow-hidden">
+        <pre className="!px-4 !pt-4 !pb-2 !m-0 font-mono text-xs md:text-sm leading-relaxed text-gray-100 bg-[#0B1120] overflow-x-auto whitespace-pre">
           <code
             dangerouslySetInnerHTML={{ __html: highlightedHtml }}
             className={`language-${language}`}

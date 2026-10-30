@@ -169,3 +169,23 @@
   color: #fbbf24; /* Amber-400 */
 }
 
+
+/* Sleek thin scrollbar for code blocks */
+pre::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+pre::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 2px;
+}
+pre::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+pre {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
