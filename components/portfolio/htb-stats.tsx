@@ -19,6 +19,12 @@ async function getHTBStats() {
 }
 
 export async function HTBStats() {
+  const buildDate = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
   const profile = await getHTBStats();
   
   if (!profile) return null;
@@ -39,8 +45,8 @@ export async function HTBStats() {
           <Target className="w-6 h-6 text-[#a72334] dark:text-green-400 transition-colors" />
         </div>
         <div>
-          <h3 className="text-2xl font-bold text-[#1a1a1a] dark:text-white tracking-wide font-serif dark:font-sans transition-colors">Hack The Box Live Stats</h3>
-          <p className="text-sm font-mono text-[#a72334]/80 dark:text-green-400/80 mt-1 transition-colors">Status: Connected</p>
+          <h3 className="text-2xl font-bold text-[#1a1a1a] dark:text-white tracking-wide font-serif dark:font-sans transition-colors">Hack The Box Stats</h3>
+          <p className="text-sm font-mono text-[#a72334]/80 dark:text-green-400/80 mt-1 transition-colors">Last synced: {buildDate}</p>
         </div>
       </div>
 

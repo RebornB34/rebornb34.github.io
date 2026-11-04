@@ -1,0 +1,173 @@
+---
+title: "HTB Crypto: Noise Codex"
+date: "2026-11-04"
+description: "Breaking an Affine Noise Cipher with the approximate GCD attack and LLL"
+category: "Crypto"
+difficulty: "Easy"
+platform: "Hack The Box"
+tags: ["crypto", "lattice", "LLL", "approximate-gcd", "DGHV"]
+---
+
+# Noise Codex
+
+| | |
+|---|---|
+| **Platform** | Hack The Box (Challenges) |
+| **Category** | Crypto |
+| **Difficulty** | Easy |
+| **Files** | `source.py`, `output.txt` |
+
+## Challenge description
+
+> This code once circulated through the cyber-underground circles of the crew known only as ECHO MIRAGE. Their doctrine was simple: "Let corporations hoard data, we'll bury truth beneath untrackable noise". Don't trust it. Don't worship it. Just run it.
+
+The download contains the encryption script and its output, a JSON list of huge integers.
+
+## Source analysis
+
+The core of `source.py` is this encryption loop:
+
+```python
+anchor = getAnchor(1024)          # one 1024-bit prime, reused for every bit
+
+for bit in bits:
+    b = int(bit)
+    distortion = random.randint(self.anchor, self.anchor**2)
+    entropy    = random.randint(2**256, 2**512)
+    c = self.anchor * distortion + 2 * entropy + b
+```
+
+Every flag bit `b` becomes one ciphertext:
+
+```
+c_i = p * q_i + (2 * r_i + b_i)
+```
+
+where:
+
+- `p` is the same secret 1024-bit prime for every ciphertext
+- `q_i` is a random multiplier between `p` and `p^2` (up to about 2048 bits)
+- `r_i` is random noise between `2^256` and `2^512`
+- `b_i` is the message bit
+
+Running `source.py` locally fails with `ImportError: cannot import name 'flag' from 'secrets'`. That is expected: the real flag is not in the download, and only `output.txt` matters.
+
+## Key observations
+
+1. **The noise is smaller than `p`.** The noise term `2r + b` is at most about 513 bits, while `p` is 1024 bits. So reducing a ciphertext modulo `p` recovers the noise exactly:
+
+   ```
+   c_i mod p = 2 * r_i + b_i
+   ```
+
+2. **The message bit is the parity of that noise.** Since `2 * r_i` is even, `b_i = (c_i mod p) mod 2`.
+
+3. **Everything reduces to recovering `p`.** Once `p` is known, decryption is one line per ciphertext.
+
+4. **Recovering `p` is the approximate GCD problem.** We have many numbers of the form `p * q_i + e_i` with small `e_i`. This is the hardness assumption behind the DGHV fully homomorphic encryption scheme, and with enough samples it is solved with lattice reduction.
+
+## Recovering p with LLL
+
+Take `c_0` as a reference and the next `t` ciphertexts `c_1 ... c_t`. Build this lattice, where `rho = 513` is the noise bit length:
+
+```
+[ 2^rho   c_1   c_2  ...  c_t ]
+[   0    -c_0    0   ...   0  ]
+[   0      0   -c_0  ...   0  ]
+[  ...                        ]
+[   0      0     0   ...  -c_0 ]
+```
+
+Take the integer combination of rows with coefficient `q_0` on the first row and `-q_i` on row `i`. The first entry becomes `q_0 * 2^rho`. Entry `i` becomes:
+
+```
+q_0 * c_i - q_i * c_0
+  = q_0 * (p*q_i + e_i) - q_i * (p*q_0 + e_0)
+  = q_0 * e_i - q_i * e_0
+```
+
+The `p * q_0 * q_i` terms cancel, so every entry of this vector is small compared with the entries of the basis. It is an unusually short lattice vector, which LLL finds.
+
+From its first coordinate we read off `q_0`, then:
+
+```
+p = c_0 // q_0
+```
+
+### How many samples are needed
+
+The attack works when the number of samples satisfies roughly `t > gamma / (eta - rho)`, where `gamma` is the ciphertext size (about 3072 bits), `eta` is the size of `p` (1024 bits) and `rho` is the noise size (513 bits). That gives `3072 / 511`, about 6. Using `t = 15` leaves a comfortable margin.
+
+## Solve script
+
+```python
+import ast
+from fpylll import IntegerMatrix, LLL
+
+cs = ast.literal_eval(open('output.txt').read())
+
+rho = 513          # 2*entropy + b fits in 513 bits
+t   = 15
+c0  = cs[0]
+xs  = cs[1:t+1]
+
+# Build the DGHV lattice
+rows = [[0]*(t+1) for _ in range(t+1)]
+rows[0][0] = 2**rho
+for i, x in enumerate(xs):
+    rows[0][i+1]   = x
+    rows[i+1][i+1] = -c0
+
+A = IntegerMatrix.from_matrix(rows)
+LLL.reduction(A)
+
+for i in range(A.nrows):
+    q0 = abs(int(A[i, 0])) // 2**rho
+    if q0 == 0:
+        continue
+    p = c0 // q0
+    # sanity checks: right size, and noise is small for the samples
+    if p.bit_length() == 1024 and all(c % p < 2**513 for c in cs[:50]):
+        bits = ''.join(str((c % p) & 1) for c in cs)
+        flag = ''.join(chr(int(bits[j:j+8], 2)) for j in range(0, len(bits), 8))
+        print(flag)
+        break
+else:
+    print("no valid p found, try a larger t")
+```
+
+An equivalent Sage version builds `matrix(ZZ, t+1, t+1)` and calls `.LLL()`, but it must be run with `sage solve.py`, not `python3`.
+
+## Environment issues I hit
+
+| Error | Cause | Fix |
+|---|---|---|
+| `NameError: name 'matrix' is not defined` | The Sage version of the script was run with plain Python | Run it with `sage`, or use the `fpylll` version |
+| `ModuleNotFoundError: No module named 'cysignals'` | `fpylll` was installed in the venv without its runtime dependency | `pip install cysignals` |
+
+If `fpylll` or `cysignals` will not build on a very new Python (3.14 here), the system package is the least painful route:
+
+```bash
+deactivate
+sudo apt install python3-fpylll
+/usr/bin/python3 solve.py
+```
+
+## Flag
+
+```
+HTB{...}
+```
+
+## Takeaways
+
+- Adding a small noise term to a multiple of a secret does not hide the secret when the **same** `p` is reused across many ciphertexts. Each extra sample gives the attacker another approximate multiple of `p`.
+- The noise bound matters. Here noise (about 513 bits) is far below `p` (1024 bits), so both lattice recovery and the final `mod p` decryption are exact.
+- The "affine" structure `c = p*q + 2r + b` is DGHV in miniature. Real DGHV picks parameters so that `t` samples are not enough for LLL, with much larger `gamma` relative to `eta - rho`.
+- General lesson: when a CTF crypto challenge gives many samples of `secret * random + small`, think approximate GCD and lattice reduction.
+
+## References
+
+- van Dijk, Gentry, Halevi, Vaikuntanathan, "Fully Homomorphic Encryption over the Integers" (2010)
+- Howgrave-Graham, "Approximate Integer Common Divisors" (2001)
+- fplll / fpylll documentation

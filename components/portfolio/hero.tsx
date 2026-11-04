@@ -27,7 +27,7 @@ export function Hero() {
             </span>
           </h1>
           <h2 className="text-2xl md:text-3xl font-semibold text-[#1a1a1a] dark:text-gray-100 font-mono tracking-wide transition-colors">
-            Student & Developer
+            Software Development student focused on cybersecurity
           </h2>
           <p className="max-w-2xl mx-auto text-lg text-gray-700 dark:text-gray-400 transition-colors">
             Building secure digital solutions and exploring the frontiers of cybersecurity

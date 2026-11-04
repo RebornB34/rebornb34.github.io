@@ -37,10 +37,22 @@ export function Contact() {
           </div>
 
           <div className="flex gap-4 pt-4">
-            <a href="#" className="w-12 h-12 rounded-full border border-[#cbc9c0] dark:border-white/10 bg-[#f0f0ea] dark:bg-[#111827] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-[#a72334] dark:hover:text-white hover:border-[#a72334] dark:hover:border-cyan-400 hover:bg-[#a72334]/10 dark:hover:bg-cyan-900/20 transition-all shadow-md hover:shadow-[0_0_15px_rgba(167,35,52,0.2)] dark:hover:shadow-[0_0_15px_rgba(34,211,238,0.3)]">
+            <a
+              href="https://www.linkedin.com/in/brian-bundi-745845354/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LinkedIn"
+              className="w-12 h-12 rounded-full border border-[#cbc9c0] dark:border-white/10 bg-[#f0f0ea] dark:bg-[#111827] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-[#a72334] dark:hover:text-white hover:border-[#a72334] dark:hover:border-cyan-400 hover:bg-[#a72334]/10 dark:hover:bg-cyan-900/20 transition-all shadow-md hover:shadow-[0_0_15px_rgba(167,35,52,0.2)] dark:hover:shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+            >
               <Linkedin className="w-5 h-5 transition-colors" />
             </a>
-            <a href="#" className="w-12 h-12 rounded-full border border-[#cbc9c0] dark:border-white/10 bg-[#f0f0ea] dark:bg-[#111827] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-[#a72334] dark:hover:text-white hover:border-[#a72334] dark:hover:border-cyan-400 hover:bg-[#a72334]/10 dark:hover:bg-cyan-900/20 transition-all shadow-md hover:shadow-[0_0_15px_rgba(167,35,52,0.2)] dark:hover:shadow-[0_0_15px_rgba(34,211,238,0.3)]">
+            <a
+              href="https://github.com/RebornB34"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+              className="w-12 h-12 rounded-full border border-[#cbc9c0] dark:border-white/10 bg-[#f0f0ea] dark:bg-[#111827] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-[#a72334] dark:hover:text-white hover:border-[#a72334] dark:hover:border-cyan-400 hover:bg-[#a72334]/10 dark:hover:bg-cyan-900/20 transition-all shadow-md hover:shadow-[0_0_15px_rgba(167,35,52,0.2)] dark:hover:shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+            >
               <Github className="w-5 h-5 transition-colors" />
             </a>
           </div>
@@ -49,6 +61,7 @@ export function Contact() {
         <div className="flex-1 w-full bg-[#f0f0ea] dark:bg-[#111827] p-8 rounded-xl border border-[#cbc9c0] dark:border-white/5 shadow-xl transition-colors duration-300">
           <form action="https://api.web3forms.com/submit" method="POST" className="space-y-6">
             <input type="hidden" name="access_key" value="cc69284c-5971-4fb5-b7a3-5de7d21aa95d" />
+            <input type="checkbox" name="botcheck" className="hidden" style={{display: "none"}} />
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-400 transition-colors">Name</label>

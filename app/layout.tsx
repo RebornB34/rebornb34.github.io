@@ -11,8 +11,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Brian Bundi | Student Engineer & Builder",
-  description: "Computer Science student and Full-Stack Developer",
+  title: "Brian Bundi | Software Development student focused on cybersecurity",
+  description: "Software Development student focused on cybersecurity",
   verification: {
     google: "KzYQBWi5PrK_-0pWxvbRvtTe-CrEhbuB_61goJQfAWY",
   },

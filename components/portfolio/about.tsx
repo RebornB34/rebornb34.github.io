@@ -9,7 +9,7 @@ export function About() {
           </h2>
           <div className="space-y-4 text-gray-700 dark:text-gray-400 leading-relaxed text-lg transition-colors">
             <p>
-              As a dedicated cybersecurity student, I'm passionate about protecting digital assets and building secure systems. My journey began with a fascination for how technology works and evolved into a mission to make the digital world safer.
+              As a Software Development student focused on cybersecurity, I'm passionate about protecting digital assets and building secure systems. My journey began with a fascination for how technology works and evolved into a mission to make the digital world safer.
             </p>
             <p>
               I combine theoretical knowledge from my studies with hands-on experience through personal projects, CTF competitions, and real-world applications. Every day presents new challenges and opportunities to learn in this rapidly evolving field.
